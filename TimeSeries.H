@@ -1,5 +1,8 @@
 
 #include <boost/date_time/posix_time/ptime.hpp>
+#include <string>
+#include <vector>
+#include <iostream>
 
 using namespace boost::posix_time;
 
@@ -33,7 +36,7 @@ class DoubleValue : public Value
 class StringValue : public Value
 {
 	public:
-		StringValue(string value);
+		StringValue(std::string value);
 };
 
 typedef std::vector<Node*> NodeList;
@@ -46,7 +49,9 @@ class Node
 		// Initialize Node.  Setup state, start any requests, etc...
 		virtual Value* Init() = 0;
 		// Update value in response to a dependency update
-		virtual Value* Evaluate(unsigned long childUpdated) = 0;
+		virtual Value* Evaluate(unsigned long childUpdated, Value* value) = 0;
+		// Create a deep copy of node
+		virtual Node* Copy() const = 0;
 
 	private:
 		// Add the given node as a parent
@@ -81,11 +86,11 @@ void Node::ChildUpdated(Node* node, Value* value)
 	}
 
 	if (!childFound) {
-		cerr << "Error in Node::ChildUpdated. Unable to find node " << node << " as child";
+		std::cerr << "Error in Node::ChildUpdated. Unable to find node " << node << " as child";
 		return;
 	}
 
-	evaluate(childIndex, value);
+	Evaluate(childIndex, value);
 }
 
 
@@ -98,7 +103,7 @@ class Graph
 	};
 	
 	typedef Node* NodeHandle;
-	static const NodeHandle NULL_HANDLE = NULL;
+	static const NodeHandle NULL_HANDLE;
 
 	public:
 		Graph();
@@ -109,23 +114,25 @@ class Graph
 
 	private:
 		Node* root_;
-		vector<Update> scheduledUpdates_;
+		std::vector<Update> scheduledUpdates_;
 };
 
-NodeHandle Graph::AddNode(NodeHandle parent, const Node& node)
+const Graph::NodeHandle Graph::NULL_HANDLE = NULL;
+
+Graph::NodeHandle Graph::AddNode(Graph::NodeHandle parent, const Node& node)
 {
-	NodeHandle n = new Node(node);
+	Graph::NodeHandle n = node.Copy();
 	if (parent == NULL_HANDLE) {
 		root_ = n;
 	}
 	else {
 		parent->children_.push_back(n);
-		n->parent_.push_back(parent);
+		n->parents_.push_back(parent);
 	}
 	return n;
 }
 
-void Graph::ConnectNodes(NodeHandle parent, NodeHandle child)
+void Graph::ConnectNodes(Graph::NodeHandle parent, Graph::NodeHandle child)
 {
 	assert(parent != NULL_HANDLE);
 	assert(child != NULL_HANDLE);
