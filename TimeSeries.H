@@ -1,8 +1,13 @@
 
+#ifndef TIMESERIES_H
+#define TIMESERIES_H
+
 #include <boost/date_time/posix_time/ptime.hpp>
+#include <boost/signal.hpp>
 #include <string>
 #include <vector>
-#include <iostream>
+#include <list>
+#include <pthread.h>
 
 using namespace boost::posix_time;
 
@@ -11,6 +16,7 @@ namespace TimeSeries
 
 class Node;
 class Graph;
+class GraphScheduler;
 
 class Value
 {
@@ -40,6 +46,7 @@ class StringValue : public Value
 };
 
 typedef std::vector<Node*> NodeList;
+typedef std::vector<Value*> ValueList;
 
 class Node
 {
@@ -54,49 +61,17 @@ class Node
 		virtual Node* Copy() const = 0;
 
 	private:
-		// Add the given node as a parent
-		//void AddParent(Node* node);
-		// Child node has updated to new value
-		void ChildUpdated(Node* node, Value* value);
-
-	private:
-		NodeList parents_;
+		Node* parent_;
 		NodeList children_;
+		ValueList childValues_;
 		Graph*   graph_;
 
 	friend class Graph;
 };
 
-Node::Node(Graph* graph) : graph_(graph)
-{
-}
-
-void Node::ChildUpdated(Node* node, Value* value)
-{
-	bool childFound = false;
-	unsigned long childIndex = 0;	
-	NodeList::iterator it;
-	int i=0;
-	for (it = children_.begin(); it != children_.end(); it++, i++) {
-		if (*it == node) {
-			childIndex = i;
-			childFound = true;
-			break;
-		}
-	}
-
-	if (!childFound) {
-		std::cerr << "Error in Node::ChildUpdated. Unable to find node " << node << " as child";
-		return;
-	}
-
-	Evaluate(childIndex, value);
-}
-
-
 class Graph
 {
-	struct Update
+	struct UpdatePair
 	{
 		Node* node;
 		Value* value;
@@ -106,47 +81,50 @@ class Graph
 	static const NodeHandle NULL_HANDLE;
 
 	public:
-		Graph();
-		// Adds a new node to 
+		Graph(GraphScheduler* scheduler);
+		~Graph();
+		// Adds a new node to graph
 		NodeHandle AddNode(NodeHandle parent, const Node& node);
+		// Connect nodes in graph
 		void ConnectNodes(NodeHandle parent, NodeHandle child);
+		// Schedule an update for a given node on the graph
 		void ScheduleUpdate(NodeHandle node, Value* value);
+		// Start the graph
+		void Start();
 
 	private:
 		Node* root_;
-		std::vector<Update> scheduledUpdates_;
+		GraphScheduler* scheduler_;
+		pthread_mutex_t mutex_;
+
+	private:
+		Value* Update(NodeHandle node, Value* value);
+
+	friend class GraphScheduler;
 };
 
-const Graph::NodeHandle Graph::NULL_HANDLE = NULL;
-
-Graph::NodeHandle Graph::AddNode(Graph::NodeHandle parent, const Node& node)
+class GraphScheduler
 {
-	Graph::NodeHandle n = node.Copy();
-	if (parent == NULL_HANDLE) {
-		root_ = n;
-	}
-	else {
-		parent->children_.push_back(n);
-		n->parents_.push_back(parent);
-	}
-	return n;
-}
+	public:
+		GraphScheduler();
+		~GraphScheduler();
 
-void Graph::ConnectNodes(Graph::NodeHandle parent, Graph::NodeHandle child)
-{
-	assert(parent != NULL_HANDLE);
-	assert(child != NULL_HANDLE);
-	parent->children_.push_back(child);
-	child->parents_.push_back(parent);
-}
+		struct Task
+		{
+			Graph* graph;
+			Graph::NodeHandle node;
+			Value* value;
+		};
+		void AddTask(const Task& task);
+		void Update();
 
-void Graph::ScheduleUpdate(Node* node, Value* value)
-{
-	Update u;
-	u.node = node;
-	u.value = value;
-	scheduledUpdates_.push_back(u);
-}
+	private:
+		std::list<Task> scheduledTasks_;
+		pthread_t thread_;
+		pthread_mutex_t mutex_;
+};
 
 } // end TimeSeries namespace
+
+#endif
 
