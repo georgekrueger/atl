@@ -110,15 +110,15 @@ Value* Graph::Update(NodeHandle node, Value* value)
 			// update parent's child value
 			parent->childValues_[index] = v;
 			// check if all parent's child values exist
-			bool nullChildValues = false;
+			bool undefinedChildren = false;
 			ValueList::iterator valueIter;
 			for (valueIter = parent->childValues_.begin(); valueIter != parent->childValues_.end(); valueIter++) {
 				if (*valueIter == NULL) {
-					nullChildValues = true;
+					undefinedChildren = true;
 					break;
 				}
 			}
-			if (nullChildValues)
+			if (undefinedChildren)
 				// stop updating graph.  parent node can't be updated because all of it's children have not reported values.
 				break;
 
@@ -182,4 +182,37 @@ void GraphScheduler::Update()
 
 	task.graph->Update(task.node, task.value);
 }
+
+NumberNode::NumberNode(signed int n) : Node(), type_(INT), int_(n)
+{
+}
+
+NumberNode::NumberNode(float n) : Node(), type_(FLOAT), float_(n)
+{
+}
+
+bool NumberNode::Init(Value& outputValue)
+{
+	switch (type_)
+	{
+		case INT:
+			return int_;
+		case FLOAT:
+			return float_;
+	}
+}
+
+ArithmeticNode::ArithmeticNode(Type type) : Node(), type_(type)
+{
+}
+
+
+Value* ArithmeticNode::Evaluate(unsigned long childUpdated, Value* value)
+{
+	switch(type_)
+	{
+
+	}
+}
+
 
