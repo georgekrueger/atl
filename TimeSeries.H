@@ -21,97 +21,55 @@ class GraphScheduler;
 class Value
 {
 	public:
-		Value();
-		Value Add(const Value& v);
-		Value Sub(const Value& v);
-		Value Mul(const Value& v);
-		Value Div(const Value& v);
-
-	private:
-		ptime timestamp;
-};
-
-class IntegerValue : public Value
-{
-	public:
-		IntegerValue(signed long value);
-
-	private:
-		signed int value;
-};
-
-class RealValue : public Value
-{
-	public:
-		RealValue(double value);
-
-	private:
-		float value;
-};
-
-class StringValue : public Value
-{
-	public:
-		StringValue(std::string value);
-
-	private:
-		std::string value;
-};
-
-class Value
-{
-	public:
-		Value() : inited_(false), type_(NONE)
+		Value() : type_(NONE)
 		{
-
 		}
 
-		void SetInt(signed int v)
+		bool IsValid()
 		{
-			inited_ = true;
-			type_ = INT;
-			intValue_ = v;
-		}
-		signed int GetInt() 
-		{
-			return intValue_;
+			return _type != NONE; 
 		}
 
-		void SetFloat(float v)
+		Type GetType()
 		{
-			inited_ = true;
-			type_ = FLOAT;
-			floatValue_ = v;
+			return type_;
 		}
 
-		float GetFloat()
+		void SetNumber(double n)
 		{
-			return float_;
+			type_ = NUMBER;
+			numberValue_ = n;
 		}
 
-		void SetString(string s)
+		double GetNumber()
 		{
-			inited_ = true;
+			return numberValue_;
+		}
+
+		void SetString(std::string s)
+		{
 			type_ = STRING;
 			stringValue_ = s;
+		}
+
+		std::string GetString()
+		{
+			return stringValue_;
 		}
 
 		enum Type
 		{
 			NONE,
-			INT,
-			FLOAT,
+			NUMBER,
 			STRING
 		};
 
 	private:
-		bool  inited_;
 		Type  type_;
 		union
 		{
-			signed int intValue;
-			float floatValue;
-			string stringValue;
+			double numberValue_;
+			std::string stringValue_;
 		};
 		ptime timestamp_;
 };
@@ -208,14 +166,7 @@ class NumberNode : public Node
 		virtual Node* Copy() const { return new NumberNode(this); }
 
 	private:
-		enum Type
-		{
-			INT,
-			FLOAT
-		};
-		Type type_;
-		float float_;
-		signed int int_;
+		double num_;
 };
 
 class ArithmeticNode : public Node
@@ -238,7 +189,7 @@ class ArithmeticNode : public Node
 	private:
 		Type type_;
 };
-
+//
 } // end TimeSeries namespace
 
 #endif
