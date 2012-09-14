@@ -76,7 +76,7 @@ void Graph::Start()
 Value* Graph::Update(NodeHandle node, Value* value)
 {
 	// lock the graph
-	pthread_mutex_lock(&mutex_);
+	Lock lock(&mutex_);
 
 	// start at given node and update every node that depends on it
 	list<UpdatePair> updates;
@@ -137,9 +137,6 @@ Value* Graph::Update(NodeHandle node, Value* value)
 		}
 	}
 
-	// unlock the graph
-	pthread_mutex_unlock(&mutex_);
-
 	return NULL;
 }
 
@@ -165,42 +162,32 @@ GraphScheduler::~GraphScheduler()
 
 void GraphScheduler::AddTask(const Task& task)
 {
-	pthread_mutex_lock(&mutex_);
+	Lock lock(&mutex_);
 	scheduledTasks_.push_back(task);
-	pthread_mutex_unlock(&mutex_);
 }
 
 void GraphScheduler::Update()
 {
-	pthread_mutex_lock(&mutex_);
+	Lock lock(&mutex_);
 	if (scheduledTasks_.empty()) {
-		pthread_mutex_unlock(&mutex_);
 		return;
 	}
 	Task task = scheduledTasks_.front();
 	scheduledTasks_.pop_front();
-	pthread_mutex_unlock(&mutex_);
+
+	lock.Release();
 
 	task.graph->Update(task.node, task.value);
 }
 
-NumberNode::NumberNode(signed int n) : Node(), type_(INT), int_(n)
-{
-}
-
-NumberNode::NumberNode(float n) : Node(), type_(FLOAT), float_(n)
+NumberNode::NumberNode(double n) : Node(), num_(n)
 {
 }
 
 bool NumberNode::Init(Value& outputValue)
 {
-	switch (type_)
-	{
-		case INT:
-			return int_;
-		case FLOAT:
-			return float_;
-	}
+	outputValue.setNumber(num_);
+	return true;
 }
 
 ArithmeticNode::ArithmeticNode(Type type) : Node(), type_(type)
@@ -208,11 +195,22 @@ ArithmeticNode::ArithmeticNode(Type type) : Node(), type_(type)
 }
 
 
-Value* ArithmeticNode::Evaluate(unsigned long childUpdated, Value* value)
+bool ArithmeticNode::Evaluate(Node::ChildIndex childUpdated, Value& outputValue);
 {
 	switch(type_)
 	{
-
+	case ADD:
+		Add(getChild(0), getChild(1), outputValue);
+		break;
+	case SUB:
+		Subtract(getChild(0), getChild(1), outputValue);
+		break;
+	case MUL:
+		Multiply(getChild(0), getChild(1), outputValue);
+		break;
+	case DIV:
+		Divide(getChild(0), getChild(1), outputValue);
+		break;
 	}
 }
 

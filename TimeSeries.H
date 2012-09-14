@@ -18,6 +18,18 @@ class Node;
 class Graph;
 class GraphScheduler;
 
+class Lock
+{
+	public:
+		Lock(pthread_mutex_t* mutex) : mutex_(mutex) { pthread_mutex_lock(mutex); }
+		~Lock() { pthread_mutex_unlock(mutex_); }
+
+		Release() { pthread_mutex_unlock(mutex_); }
+
+	private:
+		pthread_mutex_t* mutex_;
+};
+
 class Value
 {
 	public:
@@ -41,7 +53,7 @@ class Value
 			numberValue_ = n;
 		}
 
-		double GetNumber()
+		const double& GetNumber()
 		{
 			return numberValue_;
 		}
@@ -52,7 +64,7 @@ class Value
 			stringValue_ = s;
 		}
 
-		std::string GetString()
+		const std::string& GetString()
 		{
 			return stringValue_;
 		}
@@ -74,26 +86,71 @@ class Value
 		ptime timestamp_;
 };
 
-typedef std::vector<Node*> NodeList;
-typedef std::vector<Value*> ValueList;
+bool Add(const Value& v1, const Value& v2, Value& out)
+{
+	if (v1.GetType() == NUMBER && v2.GetType() == NUMBER) {
+		out.SetNumber(v1.GetNumber() + v1.GetNumber());
+	}
+	else if (v1.GetType() == STRING && v2.GetType() == STRING) {
+		out.SetString(v1.GetString() + v2.GetString());
+	}
+	else {
+		return false;
+	}
+	return true;
+}
+
+
+bool Subtract(const Value& v1, const Value& v2, Value& out)
+{
+	if (v1.GetType() == NUMBER && v2.GetType() == NUMBER) {
+		out.SetNumber(v1.GetNumber() - v1.GetNumber());
+	}
+	else {
+		return false;
+	}
+	return true;
+}
+
+bool Multiply(const Value& v1, const Value& v2, Value& out)
+{
+	if (v1.GetType() == NUMBER && v2.GetType() == NUMBER) {
+		out.SetNumber(v1.GetNumber() * v1.GetNumber());
+	}
+	else {
+		return false;
+	}
+	return true;
+}
+
+bool Divide(const Value& v1, const Value& v2, Value& out)
+{
+	if (v1.GetType() == NUMBER && v2.GetType() == NUMBER) {
+		out.SetNumber(v1.GetNumber() / v1.GetNumber());
+	}
+	else {
+		return false;
+	}
+	return true;
+}
 
 class Node
 {
 	public:
 		Node(Graph* graph);
 
+		typedef unsigned int ChildIndex;
+
 		// Initialize Node.  Setup state, start any requests, etc...
 		virtual bool Init(Value& outputValue) = 0;
-		// Update output value in response one of it's child dependencies updating.  When
-		// this method is called all dependencies will be defined.
-		virtual bool Evaluate(unsigned long childUpdated, const Value& childValue, Value& outputValue) = 0;
+		// Update output value in response one of it's child dependencies updating
+		virtual bool Evaluate(ChildIndex childUpdated, Value& outputValue) = 0;
 		// Create a deep copy of thde node
 		virtual Node* Copy() const = 0;
 
 	private:
 		Node*     parent_;
-		NodeList  children_;
-		ValueList childValues_;
+		std::vector<Node*>  children_;
 		Graph*    graph_;
 		Value     currOutputValue_;
 
@@ -158,11 +215,10 @@ class GraphScheduler
 class NumberNode : public Node
 {
 	public:
-		NumberNode(signed int n);
-		NumberNode(float n);
+		NumberNode(double n);
 
-		virtual Value* Init();
-		virtual Value* Evaluate(unsigned long childUpdated, Value* value) {}
+		virtual bool Init(Value& outputValue);
+		virtual bool Evaluate(ChildIndex childUpdated, Value& outputValue) {}
 		virtual Node* Copy() const { return new NumberNode(this); }
 
 	private:
@@ -182,8 +238,8 @@ class ArithmeticNode : public Node
 	public:
 		ArithmeticNode(Type type);
 
-		virtual Value* Init();
-		virtual Value* Evaluate(unsigned long childUpdated, Value* value);
+		virtual bool Init(Value& outputValue) {}
+		virtual bool Evaluate(ChildIndex childUpdated, Value& outputValue);
 		virtual Node* Copy() const { return new ArithmeticNode(this); }
 
 	private:
