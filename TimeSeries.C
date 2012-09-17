@@ -4,11 +4,64 @@
 #include <list>
 
 using namespace std;
+using namespace boost;
 using namespace TimeSeries;
 
-const Graph::NodeHandle Graph::NULL_HANDLE = NULL;
+Value Add(const Value& v1, const Value& v2)
+{
+	Value val;
+	if (v1.GetType() == Value::NUMBER && v2.GetType() == Value::NUMBER) {
+		val = v1.GetNumber() + v1.GetNumber();
+	}
+	else if (v1.GetType() == Value::STRING && v2.GetType() == Value::STRING) {
+		val = v1.GetString() + v2.GetString();
+	}
+	return val;
+}
 
-Node::Node(Graph* graph) : graph_(graph)
+
+Value Subtract(const Value& v1, const Value& v2)
+{
+	Value val;
+	if (v1.GetType() == Value::NUMBER && v2.GetType() == Value::NUMBER) {
+		val = v1.GetNumber() - v1.GetNumber();
+	}
+	return val;
+}
+
+Value Multiply(const Value& v1, const Value& v2)
+{
+	Value val;
+	if (v1.GetType() == Value::NUMBER && v2.GetType() == Value::NUMBER) {
+		val = v1.GetNumber() * v1.GetNumber();
+	}
+	return val;
+}
+
+Value Divide(const Value& v1, const Value& v2)
+{
+	Value val;
+	if (v1.GetType() == Value::NUMBER && v2.GetType() == Value::NUMBER) {
+		val = v1.GetNumber() / v1.GetNumber();
+	}
+	return val;
+}
+
+std::ostream& operator<< (std::ostream& stream, const Value& value)
+{
+	switch(value.GetType())
+	{
+		case Value::NUMBER:
+			stream << value.GetNumber();
+			break;
+		case Value::STRING:
+			stream << value.GetString();
+			break;
+	}
+	return stream;
+}
+
+Node::Node()
 {
 }
 
@@ -22,10 +75,12 @@ Graph::~Graph()
 	pthread_mutex_destroy(&mutex_);
 }
 
-Graph::NodeHandle Graph::AddNode(Graph::NodeHandle parent, const Node& node)
+NodeHandle Graph::AddNode(NodeHandle parent, const Node* node)
 {
-	Graph::NodeHandle n = node.Copy();
-	if (parent == NULL_HANDLE) {
+	NodeHandle n = node->Clone();
+	n->graph_ = this;
+
+	if (parent == NULL_NODE_HND) {
 		root_ = n;
 	}
 	else {
@@ -35,15 +90,7 @@ Graph::NodeHandle Graph::AddNode(Graph::NodeHandle parent, const Node& node)
 	return n;
 }
 
-void Graph::ConnectNodes(Graph::NodeHandle parent, Graph::NodeHandle child)
-{
-	assert(parent != NULL_HANDLE);
-	assert(child != NULL_HANDLE);
-	parent->children_.push_back(child);
-	child->parent_ = parent;
-}
-
-void Graph::ScheduleUpdate(NodeHandle node, Value* value)
+void Graph::ScheduleUpdate(NodeHandle node, const Value& value)
 {
 	GraphScheduler::Task task;
 	task.graph = this;
@@ -61,9 +108,9 @@ void Graph::Start()
 	nodes.push_back(root_);
 	while (!nodes.empty()) {
 		Node* curr = nodes.front();
-		Value* initValue = curr->Init();
+		Value initValue = curr->Init();
 		// schedule an update for the intial value if there is one
-		if (initValue) {
+		if (!initValue.IsUndefined()) {
 			ScheduleUpdate(curr, initValue);
 		}
 		for (NodeList::iterator it = curr->children_.begin(); it != curr->children_.end(); it++) {
@@ -73,71 +120,60 @@ void Graph::Start()
 	}
 }
 
-Value* Graph::Update(NodeHandle node, Value* value)
+optional<unsigned int> Node::FindChildIndex(Node* n)
+{
+	optional<unsigned int> index;
+	NodeList::iterator it;
+	int i=0;
+	for (it = children_.begin(); it != children_.end(); it++, i++) {
+		if (*it == n) {
+			index = i;
+			break;
+		}
+	}
+	return index;
+}
+
+bool Graph::Update(NodeHandle node, const Value& value)
 {
 	// lock the graph
 	Lock lock(&mutex_);
 
-	// start at given node and update every node that depends on it
-	list<UpdatePair> updates;
-	UpdatePair update;
-	update.node = node;
-	update.value = value;
-	updates.push_back(update);
+	node->currentValue_ = value;
 
-	while (!updates.empty()) {
-		UpdatePair u = updates.front();
-		updates.pop_front();
-		Node* n = u.node;
-		Value* v = u.value;
-		Node* parent = n->parent_;
-		if (parent == NULL) {
-			return v;
-		}
+	if (node->parent_ == NULL) {
+		return true;
+	}
 
-		// iterate parent's children to find child index
-		signed long index = -1;	
-		NodeList::iterator it;
-		int i=0;
-		for (it = parent->children_.begin(); it != parent->children_.end(); it++, i++) {
-			if (*it == n) {
-				index = i;
-				break;
+	Node* childNode = node;
+	Node* updateNode = node->parent_;
+	while (updateNode != NULL)
+	{
+		// only update node if all children are defined
+		NodeList::iterator nodeIter;
+		for (nodeIter = updateNode->children_.begin(); nodeIter != updateNode->children_.end(); nodeIter++) {
+			if ((*nodeIter)->GetCurrentValue().IsUndefined()) {
+				return true;
 			}
 		}
 
-		if (index != -1) {
-			// update parent's child value
-			parent->childValues_[index] = v;
-			// check if all parent's child values exist
-			bool undefinedChildren = false;
-			ValueList::iterator valueIter;
-			for (valueIter = parent->childValues_.begin(); valueIter != parent->childValues_.end(); valueIter++) {
-				if (*valueIter == NULL) {
-					undefinedChildren = true;
-					break;
-				}
+		optional<unsigned int> childIndex = updateNode->FindChildIndex(childNode);
+		if (childIndex) 
+		{
+			Value v;
+			v = updateNode->Evaluate(*childIndex);
+			if (v.IsUndefined()) {
+				break;
 			}
-			if (undefinedChildren)
-				// stop updating graph.  parent node can't be updated because all of it's children have not reported values.
-				break;
-
-			Value* parentValue = parent->Evaluate(index, v);
-			if (!parentValue)
-				break;
-
-			UpdatePair parentUpdate;
-			parentUpdate.node = parent;
-			parentUpdate.value = parentValue;
-			updates.push_back(parentUpdate);
-		}
-		else {
-			cerr << "Unable to find node in parent's child list. Graph will not be fully evaluated." << endl;
-			break;
+			updateNode->currentValue_ = v;
+			childNode = updateNode;
+			updateNode = updateNode->parent_;
 		}
 	}
 
-	return NULL;
+	cout << "graph output: " << childNode->GetCurrentValue() << endl;
+
+	return true;
 }
 
 /*void* GraphSchedulerLoop(void* arg)
@@ -184,34 +220,48 @@ NumberNode::NumberNode(double n) : Node(), num_(n)
 {
 }
 
-bool NumberNode::Init(Value& outputValue)
+Value NumberNode::Init()
 {
-	outputValue.setNumber(num_);
-	return true;
+	Value val;
+	val = num_;
+	return val;
+}
+
+Value NumberNode::Evaluate(unsigned int childUpdated)
+{
+	return Value();
 }
 
 ArithmeticNode::ArithmeticNode(Type type) : Node(), type_(type)
 {
 }
 
-
-bool ArithmeticNode::Evaluate(Node::ChildIndex childUpdated, Value& outputValue);
+Value ArithmeticNode::Init()
 {
+	return Value();
+}
+
+Value ArithmeticNode::Evaluate(unsigned int childUpdated)
+{
+	Value val;
+	const Value& v1 = GetChild(0)->GetCurrentValue();
+	const Value& v2 = GetChild(1)->GetCurrentValue();
 	switch(type_)
 	{
 	case ADD:
-		Add(getChild(0), getChild(1), outputValue);
+		val = Add(v1, v2);
 		break;
 	case SUB:
-		Subtract(getChild(0), getChild(1), outputValue);
+		val = Subtract(v1, v2);
 		break;
 	case MUL:
-		Multiply(getChild(0), getChild(1), outputValue);
+		val = Multiply(v1, v2);
 		break;
 	case DIV:
-		Divide(getChild(0), getChild(1), outputValue);
+		val = Divide(v1, v2);
 		break;
 	}
+	return val;
 }
 
 
