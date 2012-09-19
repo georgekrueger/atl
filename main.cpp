@@ -5,12 +5,19 @@
 //extern int yyparse();
 
 using namespace TimeSeries;
+using namespace std;
 
 int main(int argc, char **argv)
 {
     //yyparse();
     //std::cout << programBlock << std::endl;
 	//programBlock->compile();
+
+	cout << "sizeof(Value): " << sizeof(Value) << endl;
+
+	boost::optional<Value> v;
+
+	cout << sizeof(v) << endl;
 
 	NumberNode numNode1(10);
 	NumberNode numNode2(5);
