@@ -61,7 +61,7 @@ std::ostream& operator<< (std::ostream& stream, const Value& value)
 	return stream;
 }
 
-Node::Node()
+Node::Node() : parent_(NULL), graph_(NULL)
 {
 }
 

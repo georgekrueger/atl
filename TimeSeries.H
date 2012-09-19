@@ -54,7 +54,7 @@ class Value
 
 		bool IsUndefined() const 
 		{
-			return type_ != NONE; 
+			return type_ == NONE; 
 		}
 
 		Type GetType() const
