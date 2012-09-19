@@ -110,6 +110,9 @@ class Node
 		const Value& GetCurrentValue() const { return currentValue_; }
 		const Node* GetChild(unsigned int i) const { return children_[i]; }
 
+	protected:
+		void ScheduleUpdate(const Value& v);
+
 	private:
 		Node*     parent_;
 		NodeList  children_;
@@ -199,6 +202,18 @@ class ArithmeticNode : public Node
 
 	private:
 		Type type_;
+};
+
+class TimedNode : public Node
+{
+	public:
+		TimedNode();
+		virtual Value Init();
+		virtual Value Evaluate(unsigned int childUpdated);
+		virtual Node* Clone() const { return new TimedNode(*this); }
+		void Update();
+	private:
+		pthread_t thread_;
 };
 //
 } // end TimeSeries namespace

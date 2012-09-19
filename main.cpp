@@ -20,7 +20,7 @@ int main(int argc, char **argv)
 	cout << sizeof(v) << endl;
 
 	NumberNode numNode1(10);
-	NumberNode numNode2(5);
+	TimedNode numNode2;
 	ArithmeticNode addNode(ArithmeticNode::ADD);
 
 	GraphScheduler scheduler;

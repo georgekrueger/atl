@@ -65,6 +65,11 @@ Node::Node() : parent_(NULL), graph_(NULL)
 {
 }
 
+void Node::ScheduleUpdate(const Value& v) 
+{ 
+	graph_->ScheduleUpdate(this, v); 
+}
+
 Graph::Graph(GraphScheduler* scheduler) : root_(NULL), scheduler_(scheduler)
 {
 	pthread_mutex_init(&mutex_, NULL);
@@ -145,6 +150,8 @@ bool Graph::Update(NodeHandle node, const Value& value)
 		return true;
 	}
 
+	cout << "handle update. val: " << value << endl;
+
 	Node* childNode = node;
 	Node* updateNode = node->parent_;
 	while (updateNode != NULL)
@@ -153,6 +160,7 @@ bool Graph::Update(NodeHandle node, const Value& value)
 		NodeList::iterator nodeIter;
 		for (nodeIter = updateNode->children_.begin(); nodeIter != updateNode->children_.end(); nodeIter++) {
 			if ((*nodeIter)->GetCurrentValue().IsUndefined()) {
+				cout << "child undefined!" << endl;
 				return true;
 			}
 		}
@@ -264,4 +272,36 @@ Value ArithmeticNode::Evaluate(unsigned int childUpdated)
 	return val;
 }
 
+TimedNode::TimedNode()
+{
+}
+
+
+void* TimedNodeThreadLoop(void* arg)
+{
+	while (1) {
+		((TimedNode*)arg)->Update();
+		sleep(1);
+	}
+}
+
+Value TimedNode::Init()
+{
+	pthread_create(&thread_, NULL, TimedNodeThreadLoop, (void*)this);
+	srand(0);
+	return Value();
+}
+
+Value TimedNode::Evaluate(unsigned int childUpdated)
+{
+}
+
+void TimedNode::Update()
+{
+	int r = rand() % 50;
+	double r2 = r;
+	Value v;
+	v = r2;
+	ScheduleUpdate(v);
+}
 
