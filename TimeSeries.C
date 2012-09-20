@@ -11,7 +11,7 @@ Value Add(const Value& v1, const Value& v2)
 {
 	Value val;
 	if (v1.GetType() == Value::NUMBER && v2.GetType() == Value::NUMBER) {
-		val = v1.GetNumber() + v1.GetNumber();
+		val = v1.GetNumber() + v2.GetNumber();
 	}
 	else if (v1.GetType() == Value::STRING && v2.GetType() == Value::STRING) {
 		val = v1.GetString() + v2.GetString();
@@ -24,7 +24,7 @@ Value Subtract(const Value& v1, const Value& v2)
 {
 	Value val;
 	if (v1.GetType() == Value::NUMBER && v2.GetType() == Value::NUMBER) {
-		val = v1.GetNumber() - v1.GetNumber();
+		val = v1.GetNumber() - v2.GetNumber();
 	}
 	return val;
 }
@@ -33,7 +33,7 @@ Value Multiply(const Value& v1, const Value& v2)
 {
 	Value val;
 	if (v1.GetType() == Value::NUMBER && v2.GetType() == Value::NUMBER) {
-		val = v1.GetNumber() * v1.GetNumber();
+		val = v1.GetNumber() * v2.GetNumber();
 	}
 	return val;
 }
@@ -42,7 +42,7 @@ Value Divide(const Value& v1, const Value& v2)
 {
 	Value val;
 	if (v1.GetType() == Value::NUMBER && v2.GetType() == Value::NUMBER) {
-		val = v1.GetNumber() / v1.GetNumber();
+		val = v1.GetNumber() / v2.GetNumber();
 	}
 	return val;
 }
